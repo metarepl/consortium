@@ -28,24 +28,36 @@ TODO eliminate the configuration line. declaring the dependency in asdf should b
 
 * eg configuration
 
-;; ~/.stumpwmrc
+FILE ~/.stumpwmrc
+#+begin_src lisp
 (ql:quickload :consortium)
 (consortium:register-source :stumpwm)
 
-;; Then from any node:
+#+end_src
+
+Then from any node:
+#+begin_src lisp
 (consortium:nodes)
 (consortium:eval-at "nyxt" '(nyxt:current-url))
 (consortium:sync-all)
+#+end_src
 
 * eg configuration minimal
 
+FILE ~/.stumpwmrc
+#+begin_src lisp
 (ql:quickload '(:micros :swank-client :consortium))
 (consortium:register "stumpwm" 40001)
+#+end_src
 
+FILE ~/.nyxtrc
+#+begin_src lisp
 (ql:quickload '(:micros :swank-client :consortium))
 (consortium:register "nyxt" 40002)
+#+end_src
 
-;; From either image:
+From either image:
+#+begin_src lisp
 (consortium:nodes)
 ;; => ((:NAME "stumpwm" :PORT 40001) (:NAME "nyxt" :PORT 40002))
 
@@ -53,3 +65,4 @@ TODO eliminate the configuration line. declaring the dependency in asdf should b
 ;; => 2
 
 (consortium:eval-at "stumpwm" '(stumpwm:current-window))
+#+end_src
