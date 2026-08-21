@@ -1,0 +1,50 @@
+* consortium
+
+A consortium is an association of two or more
+individuals, companies, organizations, or governments
+with the objective of participating in a common activity or pooling their resources
+for achieving a common goal.
+
+Consortium is a Latin word meaning
+"partnership", "association", or "society",
+and derives from consors ("shared in property"),
+itself from con- ("together") and sors ("fate").
+
+Consortium system is a coordination layer for networked Common Lisp images.
+Each image (exempli gratia: StumpWM, Nyxt, Lem, etc.)
+independently registers itself with consortium
+creating a mesh of cooperating Lisp processes that can evaluate code
+in each other and share symbols — a lightweight Lisp machine network.
+
+WIP
+
+* eg configuration
+
+TODO eliminate the configuration line
+declaring the dependency should be sufficient to register
+
+;; ~/.stumpwmrc
+(ql:quickload :target-pak)
+(target-pak:register-source :stumpwm)
+
+;; Then from any node:
+(target-pak:nodes)
+(target-pak:eval-at "nyxt" '(nyxt:current-url))
+(target-pak:sync-all)
+
+* eg configuration minimal
+
+(ql:quickload '(:swank :swank-client :target-pak))
+(target-pak:register "stumpwm" 40001)
+
+(ql:quickload '(:swank :swank-client :target-pak))
+(target-pak:register "nyxt" 40002)
+
+;; From either image:
+(target-pak:nodes)
+;; => ((:NAME "stumpwm" :PORT 40001) (:NAME "nyxt" :PORT 40002))
+
+(target-pak:eval-at "nyxt" '(+ 1 1))
+;; => 2
+
+(target-pak:eval-at "stumpwm" '(stumpwm:current-window))
