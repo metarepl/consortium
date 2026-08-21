@@ -18,8 +18,11 @@
         collect (with-open-file (s f) (read s))))
 
 (defun eval-at (name form)
-  "Evaluate FORM at NAME."
-  (let* ((info (find name (nodes) :key (lambda (i) (getf i :name)) :test #'string-equal))
-         (port (getf info :port)))
-    (micros-client:with-slime-connection (c "localhost" port)
-      (micros-client:slime-eval form c))))
+  (uiop:not-implemented-error "replace swank with micros"))
+
+;; (defun eval-at (name form)
+;;   "Evaluate FORM at NAME."
+;;   (let* ((info (find name (nodes) :key (lambda (i) (getf i :name)) :test #'string-equal))
+;;          (port (getf info :port)))
+;;     (micros-client:with-slime-connection (c "localhost" port)
+;;       (micros-client:slime-eval form c))))
