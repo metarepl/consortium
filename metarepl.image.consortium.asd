@@ -6,8 +6,7 @@
   :depends-on (:alexandria
                :serapeum
 
-               :swank
-               :swank-client
+               :micros
                :usocket
                :bordeaux-threads
 

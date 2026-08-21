@@ -23,28 +23,30 @@ WIP
 TODO eliminate the configuration line
 declaring the dependency should be sufficient to register
 
+TODO eliminate swank prefering micros
+
 ;; ~/.stumpwmrc
-(ql:quickload :target-pak)
-(target-pak:register-source :stumpwm)
+(ql:quickload :consortium)
+(consortium:register-source :stumpwm)
 
 ;; Then from any node:
-(target-pak:nodes)
-(target-pak:eval-at "nyxt" '(nyxt:current-url))
-(target-pak:sync-all)
+(consortium:nodes)
+(consortium:eval-at "nyxt" '(nyxt:current-url))
+(consortium:sync-all)
 
 * eg configuration minimal
 
-(ql:quickload '(:swank :swank-client :target-pak))
-(target-pak:register "stumpwm" 40001)
+(ql:quickload '(:micros :swank-client :consortium))
+(consortium:register "stumpwm" 40001)
 
-(ql:quickload '(:swank :swank-client :target-pak))
-(target-pak:register "nyxt" 40002)
+(ql:quickload '(:micros :swank-client :consortium))
+(consortium:register "nyxt" 40002)
 
 ;; From either image:
-(target-pak:nodes)
+(consortium:nodes)
 ;; => ((:NAME "stumpwm" :PORT 40001) (:NAME "nyxt" :PORT 40002))
 
-(target-pak:eval-at "nyxt" '(+ 1 1))
+(consortium:eval-at "nyxt" '(+ 1 1))
 ;; => 2
 
-(target-pak:eval-at "stumpwm" '(stumpwm:current-window))
+(consortium:eval-at "stumpwm" '(stumpwm:current-window))

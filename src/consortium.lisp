@@ -1,4 +1,4 @@
-(in-package :target-pak)
+(in-package :consortium)
 
 ;;;; =========================================================================
 ;;;; Configuration
@@ -8,7 +8,7 @@
 ;; OS processes that can't share memory. A simple directory of files is
 ;; more robust than a central server that could become a single point of failure.
 (defvar *registry-path*
-  (merge-pathnames ".config/target-pak/registry/"
+  (merge-pathnames ".config/consortium/registry/"
                    (user-homedir-pathname)))
 
 ;; Local cache avoids hitting the filesystem on every operation.
@@ -85,13 +85,13 @@
         finally (error "No free port found between ~A and ~A" start end)))
 
 ;;;; =========================================================================
-;;;; Swank Server
+;;;; Micros Server
 ;;;; =========================================================================
 
-(defun start-swank (port)
+(defun start-micros (port)
   ;; dont-close keeps the server running after the first client disconnects,
   ;; which is essential since we expect multiple connections over time.
-  (swank:create-server :port port :dont-close t)
+  (micros:create-server :port port :dont-close t)
   port)
 
 ;;;; =========================================================================
@@ -112,7 +112,7 @@
       (let ((name (getf info :name)))
         ;; Don't prune ourselves even if the check fails.
         (unless (and *self* (string= name (getf *self* :name)))
-          (format t "~&[target-pak] Pruning dead node: ~A~%" name)
+          (format t "~&[consortium] Pruning dead node: ~A~%" name)
           (delete-node-file name))))))
 
 (defun start-heartbeat ()
@@ -125,7 +125,7 @@
            (loop
              (sleep *heartbeat-interval*)
              (ignore-errors (prune-dead-nodes))))
-         :name "target-pak-heartbeat")))
+         :name "consortium-heartbeat")))
 
 (defun compute-symbol-hash (package)
   ;; Sorting ensures deterministic hashing regardless of internal symbol order.
@@ -145,7 +145,7 @@
         (setf (getf *self* :symbol-hash) new-hash
               (getf *self* :updated-at) (get-universal-time))
         (write-node-file (getf *self* :name) *self*)
-        (format t "~&[target-pak] Exports changed, registration updated~%")))))
+        (format t "~&[consortium] Exports changed, registration updated~%")))))
 
 (defun start-self-monitor ()
   ;; Clean up existing thread to allow re-registration.
@@ -157,7 +157,7 @@
            (loop
              (sleep *self-monitor-interval*)
              (ignore-errors (update-registration))))
-         :name "target-pak-self-monitor")))
+         :name "consortium-self-monitor")))
 
 (defun stop-monitors ()
   ;; Clean shutdown for both threads.
@@ -186,7 +186,7 @@
     (warn "No exit hook mechanism known for this implementation")))
 
 (defun register-source (source-package &key name)
-  "Register this Lisp image as a node in the target-pak network.
+  "Register this Lisp image as a node in the consortium network.
    Call this from your application's config file."
   (let* ((pkg (find-package source-package))
          (node-name (or name (package-name pkg)))
@@ -204,7 +204,7 @@
     (unless pkg
       (error "Package ~A not found" source-package))
 
-    (start-swank port)
+    (start-micros port)
 
     ;; Compute initial symbol hash for change detection.
     (setf *symbol-hash* (compute-symbol-hash pkg))
@@ -219,7 +219,7 @@
     (start-heartbeat)
     (start-self-monitor)
 
-    (format t "~&[target-pak] ~A registered on port ~A~%" node-name port)
+    (format t "~&[consortium] ~A registered on port ~A~%" node-name port)
     info))
 
 (defun unregister ()
@@ -227,7 +227,7 @@
   (when *self*
     (stop-monitors)
     (delete-node-file (getf *self* :name))
-    (format t "~&[target-pak] ~A unregistered~%" (getf *self* :name))
+    (format t "~&[consortium] ~A unregistered~%" (getf *self* :name))
     (setf *self* nil
           *symbol-hash* nil)))
 
@@ -264,8 +264,8 @@
          (port (getf info :port))
          (host (getf info :hostname)))
     (handler-case
-        (swank-client:with-slime-connection (conn host port)
-          (swank-client:slime-eval form conn))
+        (micros-client:with-slime-connection (conn host port)
+          (micros-client:slime-eval form conn))
       (error (e)
         ;; If we can't reach a node, remove it from the registry so others
         ;; don't waste time on it. The node will re-register if it comes back.
@@ -294,7 +294,7 @@
                     `(loop for s being the external-symbols of ,remote-pkg
                            collect (symbol-name s)))))
     (dolist (sym-name symbols)
-      (let ((local-sym (intern sym-name :target-pak)))
+      (let ((local-sym (intern sym-name :consortium)))
         ;; Each stub captures the node name and symbol name, then delegates.
         ;; This creates transparent remote procedure calls.
         (let ((captured-name node-name)
@@ -305,8 +305,8 @@
                   (eval-at captured-name
                     `(apply (find-symbol ,captured-sym ,captured-pkg)
                             ',args)))))
-        (export local-sym :target-pak)))
-    (format t "~&[target-pak] Imported ~A symbols from ~A~%"
+        (export local-sym :consortium)))
+    (format t "~&[consortium] Imported ~A symbols from ~A~%"
             (length symbols) node-name)
     symbols))
 
