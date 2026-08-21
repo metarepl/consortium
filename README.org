@@ -37,14 +37,14 @@ FILE ~/.stumpwmrc
 FILE ~/.nyxtrc
 #+begin_src lisp
   (asdf:load-system :metarepl.image.consortium)
-  (consortium:register-source :stumpwm)
+  (consortium:register-source :nyxt)
 #+end_src
 
 Then from any node:
 #+begin_src lisp
   (consortium:nodes)
 
-  (consortium:eval-at "nyxt" '(nyxt:current-url))
+  (consortium:eval-at :nyxt '(nyxt:current-url))
 
   (consortium:sync-all)
 #+end_src
