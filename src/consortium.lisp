@@ -1,5 +1,8 @@
 (in-package :consortium)
 
+;; &&& use https://github.com/kanru/cl-isolated to sandbox inter image calls?
+;; &&& or secure incoming connections to a repl by password?
+
 ;;;; =========================================================================
 ;;;; Configuration
 ;;;; =========================================================================
@@ -258,23 +261,20 @@
 ;;;; Remote Evaluation
 ;;;; =========================================================================
 
-(defun eval-at (node form)
-  (uiop:not-implemented-error "replace swank with micros"))
-
-;; (defun eval-at (node form)
-;;   "Evaluate FORM in another node's image."
-;;   (let* ((info (get-node (string node)))
-;;          (port (getf info :port))
-;;          (host (getf info :hostname)))
-;;     (handler-case
-;;         (micros-client:with-slime-connection (conn host port)
-;;           (micros-client:slime-eval form conn))
-;;       (error (e)
-;;         ;; If we can't reach a node, remove it from the registry so others
-;;         ;; don't waste time on it. The node will re-register if it comes back.
-;;         (delete-node-file (string node))
-;;         (remhash (string node) *nodes-cache*)
-;;         (error "Node ~A unreachable (pruned): ~A" node e)))))
+(defun eval-in (node form)
+  "Evaluate FORM in another node's image."
+  (let* ((info (get-node (string node)))
+         (port (getf info :port))
+         (host (getf info :hostname)))
+    (handler-case
+        (swank-client:with-slime-connection (conn host port)
+          (swank-client:slime-eval form conn))
+      (error (e)
+        ;; If we can't reach a node, remove it from the registry so others
+        ;; don't waste time on it. The node will re-register if it comes back.
+        (delete-node-file (string node))
+        (remhash (string node) *nodes-cache*)
+        (error "Node ~A unreachable (pruned): ~A" node e)))))
 
 (defun broadcast (form)
   "Evaluate FORM in all registered nodes."

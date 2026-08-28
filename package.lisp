@@ -16,7 +16,7 @@
   (:export #:register-source
            #:unregister
            #:nodes
-           #:eval-at
+           #:eval-in
            #:broadcast
            #:sync-all
            #:import-remote-symbols
@@ -26,4 +26,4 @@
   (:use #:cl)
   (:export #:register
            #:nodes
-           #:eval-at))
+           #:eval-in))

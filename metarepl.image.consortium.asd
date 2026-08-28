@@ -7,6 +7,7 @@
                :serapeum
 
                :micros
+               :swank-client
                :usocket
                :bordeaux-threads
 
