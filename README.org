@@ -26,13 +26,13 @@ TODO import and symbol sync between images
 FILE ~/.stumpwmrc
 #+begin_src lisp
   (asdf:load-system :metarepl.image.consortium)
-  (consortium:register-source :stumpwm)
+  (consortium:register-image :stumpwm)
 #+end_src
 
 FILE ~/.nyxtrc
 #+begin_src lisp
   (asdf:load-system :metarepl.image.consortium)
-  (consortium:register-source :nyxt)
+  (consortium:register-image :nyxt)
 #+end_src
 
 Then from any node:
