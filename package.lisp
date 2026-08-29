@@ -1,4 +1,4 @@
-(defpackage :consortium
+(defpackage #:consortium
   (:nicknames #:metarepl.image.consortium)
   (:documentation "consortium main package")
   (:use #:cl)
@@ -13,8 +13,8 @@
   ;; (:local-nicknames (#:jzon #:com.inuoe.jzon))
   ;; ;; #:str #:cmd #:file-finder
 
-  (:export #:register-source
-           #:unregister
+  (:export #:register-image
+           #:unregister-image
            #:nodes
            #:eval-in
            #:broadcast
@@ -22,7 +22,12 @@
            #:import-remote-symbols
            #:*registry-path*))
 
-(defpackage :consortium/minimal
+(defpackage #:consortium/sync
+  (:documentation "synced symbols")
+  (:use )
+  (:export))
+
+(defpackage #:consortium/minimal
   (:use #:cl)
   (:export #:register
            #:nodes

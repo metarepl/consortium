@@ -19,36 +19,36 @@
 (defvar *nodes-cache* (make-hash-table :test 'equal))
 
 ;; Track our own identity so we can update our registration when things change.
-(defvar *self* nil)
+(defvar *this-node* nil)
 
 ;; Used to detect when our exported symbols change, triggering re-registration.
 (defvar *symbol-hash* nil)
 
-;; Background threads for monitoring — stored so we can clean them up.
+;; Background threads for monitoring
 (defvar *heartbeat-thread* nil)
 (defvar *self-monitor-thread* nil)
 
 ;; Tuning parameters. Heartbeat is less frequent because checking liveness
 ;; requires network round-trips to every node.
-(defvar *heartbeat-interval* 30)
-(defvar *self-monitor-interval* 10)
+(defvar *heartbeat-interval* 37)
+(defvar *self-monitor-interval* 11)
 
 ;;;; =========================================================================
 ;;;; Filesystem Registry
 ;;;; =========================================================================
 
-(defun ensure-registry-dir ()
-  (ensure-directories-exist *registry-path*))
+(defun make-name (name)
+  "converts string or keyword or symbol to downcased string"
+  (format nil "~(~A~)" name))
 
 (defun node-file (name)
   ;; Each node gets one file. The filename is the node name, making it
   ;; trivial to find, update, or remove a specific node's registration.
-  (merge-pathnames (format nil "~(~A~).sexp" name)
+  (merge-pathnames (format nil "~A.node" (make-name name))
                    *registry-path*))
 
 (defun write-node-file (name info)
-  (ensure-registry-dir)
-  ;; Overwrites atomically. If we crash mid-write, the old file remains.
+  (ensure-directories-exist *registry-path*)
   (with-open-file (s (node-file name)
                      :direction :output
                      :if-exists :supersede)
@@ -66,34 +66,22 @@
 (defun scan-registry ()
   ;; Returns all registered nodes. We read everything because we don't know
   ;; which nodes exist until we look.
-  (ensure-registry-dir)
-  (loop for file in (directory (merge-pathnames "*.sexp" *registry-path*))
+  (ensure-directories-exist *registry-path*)
+  (loop for file in (directory (merge-pathnames "*.node" *registry-path*))
         for info = (ignore-errors (read-node-file file))
         when info collect info))
 
 ;;;; =========================================================================
-;;;; Port Management
+;;;; Server
 ;;;; =========================================================================
 
-(defun find-free-port (&optional (start 40000) (end 40100))
-  ;; We try to bind and immediately release. This has a small race condition
-  ;; but it's acceptable — the alternative is managing a port registry, which
-  ;; adds complexity for minimal benefit.
-  (loop for port from start below end
-        when (ignore-errors
-               (let ((socket (usocket:socket-listen "127.0.0.1" port)))
-                 (usocket:socket-close socket)
-                 t))
-          return port
-        finally (error "No free port found between ~A and ~A" start end)))
+(defun find-free-port (&optional (start 40000) (end 41000))
+  (let ((port (find-port:find-port :min start :max end)))
+    (if (null port)
+        (error "No free port found between ~A and ~A" start end)
+        port)))
 
-;;;; =========================================================================
-;;;; Micros Server
-;;;; =========================================================================
-
-(defun start-micros (port)
-  ;; dont-close keeps the server running after the first client disconnects,
-  ;; which is essential since we expect multiple connections over time.
+(defun start-server (port)
   (micros:create-server :port port :dont-close t)
   port)
 
@@ -102,10 +90,12 @@
 ;;;; =========================================================================
 
 (defun node-alive-p (info)
-  ;; A simple arithmetic eval is the cheapest possible liveness check.
+  ;; simple arithmetic eval as a liveness check.
   ;; If this fails, the node is definitely unreachable.
+
+  ;; TODO at the end of a call micros barks about disconnnection, stop the print
   (ignore-errors
-    (eql 2 (eval-at (getf info :name) '(+ 1 1)))))
+    (eql 42 (eval-in (getf info :name) '(+ 40 2)))))
 
 (defun prune-dead-nodes ()
   ;; Iterate a snapshot of the registry to avoid issues with concurrent modification.
@@ -114,12 +104,16 @@
     (unless (node-alive-p info)
       (let ((name (getf info :name)))
         ;; Don't prune ourselves even if the check fails.
-        (unless (and *self* (string= name (getf *self* :name)))
+        (unless (and *this-node*
+                     (string= name (getf *this-node* :name)))
           (format t "~&[consortium] Pruning dead node: ~A~%" name)
           (delete-node-file name))))))
 
+(defun heartbeat-tasks ()
+  (ignore-errors (prune-dead-nodes)))
+
 (defun start-heartbeat ()
-  ;; Clean up existing thread to allow re-registration without leaking threads.
+  ;; Clean up existing thread to allow re-registration
   (when (and *heartbeat-thread* (bt:thread-alive-p *heartbeat-thread*))
     (bt:destroy-thread *heartbeat-thread*))
   (setf *heartbeat-thread*
@@ -127,7 +121,7 @@
          (lambda ()
            (loop
              (sleep *heartbeat-interval*)
-             (ignore-errors (prune-dead-nodes))))
+             (heartbeat-tasks)))
          :name "consortium-heartbeat")))
 
 (defun compute-symbol-hash (package)
@@ -137,18 +131,30 @@
                collect (symbol-name s))
          #'string<)))
 
+(defun ensure-registration ()
+  ;; registration file exists
+  (when *this-node*
+    (let* ((name (getf *this-node* :name))
+           (node-file (node-file name)))
+      (unless (probe-file node-file)
+        (write-node-file name *this-node*)))))
+
 (defun update-registration ()
   ;; Only re-write the file if something actually changed, avoiding
   ;; unnecessary I/O and timestamp churn.
-  (when *self*
-    (let* ((pkg (find-package (getf *self* :package)))
+  (when *this-node*
+    (let* ((pkg (find-package (getf *this-node* :package)))
            (new-hash (compute-symbol-hash pkg)))
       (unless (eql new-hash *symbol-hash*)
         (setf *symbol-hash* new-hash)
-        (setf (getf *self* :symbol-hash) new-hash
-              (getf *self* :updated-at) (get-universal-time))
-        (write-node-file (getf *self* :name) *self*)
+        (setf (getf *this-node* :symbol-hash) new-hash
+              (getf *this-node* :updated-at) (get-universal-time))
+        (write-node-file (getf *this-node* :name) *this-node*)
         (format t "~&[consortium] Exports changed, registration updated~%")))))
+
+(defun self-monitor-tasks ()
+  (ensure-registration)
+  (ignore-errors (update-registration)))
 
 (defun start-self-monitor ()
   ;; Clean up existing thread to allow re-registration.
@@ -159,7 +165,7 @@
          (lambda ()
            (loop
              (sleep *self-monitor-interval*)
-             (ignore-errors (update-registration))))
+             (self-monitor-tasks)))
          :name "consortium-self-monitor")))
 
 (defun stop-monitors ()
@@ -175,63 +181,65 @@
 ;;;; Registration
 ;;;; =========================================================================
 
-(defun register-exit-hook (name)
+(defun stop-node (name port)
+  (delete-node-file name)
+  (stop-monitors)
+  (micros:stop-server port))
+
+(defun register-exit-hook (name port)
   ;; Different implementations have different hook mechanisms.
   ;; We want to clean up our registry file on graceful exit so other
   ;; nodes don't waste time trying to contact us.
-  (let ((cleanup (lambda ()
-                   (ignore-errors (delete-node-file name))
-                   (ignore-errors (stop-monitors)))))
+  (let* ((cleanup (lambda () (stop-node name port))))
     #+sbcl (push cleanup sb-ext:*exit-hooks*)
     #+ccl (push cleanup ccl:*lisp-cleanup-functions*)
     #+ecl (push cleanup si:*exit-hooks*)
     #-(or sbcl ccl ecl)
     (warn "No exit hook mechanism known for this implementation")))
 
-(defun register-source (source-package &key name)
+(defun register-image (node-name)
   "Register this Lisp image as a node in the consortium network.
-   Call this from your application's config file."
-  (let* ((pkg (find-package source-package))
-         (node-name (or name (package-name pkg)))
+   Call this from a lisp application's config file."
+  (let* ((pkg-name (package-name *package*))
+         (name (make-name node-name))
+         (pid #+sbcl (sb-posix:getpid)
+              #+ccl (ccl::getpid)
+              #-(or sbcl ccl) 0)
          (port (find-free-port))
-         (info (list :name node-name
-                     :package (package-name pkg)
+         (info (list :name name
+                     :package pkg-name
                      :port port
                      :hostname "localhost"
                      ;; PID helps distinguish between restarts of the same app.
-                     :pid #+sbcl (sb-posix:getpid)
-                          #+ccl (ccl::getpid)
-                          #-(or sbcl ccl) 0
+                     :pid pid
                      :registered-at (get-universal-time)
                      :symbol-hash nil)))
-    (unless pkg
-      (error "Package ~A not found" source-package))
 
-    (start-micros port)
+    (start-server port)
 
     ;; Compute initial symbol hash for change detection.
-    (setf *symbol-hash* (compute-symbol-hash pkg))
+    (setf *symbol-hash* (compute-symbol-hash *package*))
     (setf (getf info :symbol-hash) *symbol-hash*)
 
-    (write-node-file node-name info)
-    (setf *self* info)
+    (write-node-file name info)
+    (setf *this-node* info)
 
-    (register-exit-hook node-name)
+    (register-exit-hook name port)
 
     ;; Background monitors make the network self-healing.
-    (start-heartbeat)
-    (start-self-monitor)
+    ;; (start-heartbeat)
+    ;; (start-self-monitor)
 
-    (format t "~&[consortium] ~A registered on port ~A~%" node-name port)
+    (format t "~&[consortium] registered ~A on port ~A~%" name port)
     info))
 
-(defun unregister ()
+(defun unregister-image ()
   "Remove this node from the network."
-  (when *self*
-    (stop-monitors)
-    (delete-node-file (getf *self* :name))
-    (format t "~&[consortium] ~A unregistered~%" (getf *self* :name))
-    (setf *self* nil
+  (when *this-node*
+    (stop-node (getf *this-node* :name)
+               (getf *this-node* :port))
+    (format t "~&[consortium] ~A unregistered~%" (getf *this-node* :name))
+    (setf *this-node* nil
           *symbol-hash* nil)))
 
 ;;;; =========================================================================
@@ -254,7 +262,7 @@
 
 (defun get-node (name)
   (refresh-nodes)
-  (or (gethash (string name) *nodes-cache*)
+  (or (gethash (make-name name) *nodes-cache*)
       (error "Unknown node: ~A" name)))
 
 ;;;; =========================================================================
@@ -262,8 +270,9 @@
 ;;;; =========================================================================
 
 (defun eval-in (node form)
-  "Evaluate FORM in another node's image."
-  (let* ((info (get-node (string node)))
+  "Evaluate FORM in the image of another node."
+  (let* ((info (get-node node))
+         (name (getf info :name))
          (port (getf info :port))
          (host (getf info :hostname)))
     (handler-case
@@ -272,8 +281,8 @@
       (error (e)
         ;; If we can't reach a node, remove it from the registry so others
         ;; don't waste time on it. The node will re-register if it comes back.
-        (delete-node-file (string node))
-        (remhash (string node) *nodes-cache*)
+        (delete-node-file name)
+        (remhash name *nodes-cache*)
         (error "Node ~A unreachable (pruned): ~A" node e)))))
 
 (defun broadcast (form)
@@ -281,23 +290,24 @@
   ;; Collect results even if some nodes fail, so partial results are still useful.
   (loop for info in (nodes)
         for name = (getf info :name)
-        collect (cons name (ignore-errors (eval-at name form)))))
+        collect (cons name (ignore-errors (eval-in name form)))))
 
 ;;;; =========================================================================
 ;;;; Symbol Sharing
 ;;;; =========================================================================
 
-(defun import-remote-symbols (node)
+;; TODO choose package to import from
+(defun sync-remote-symbols (node)
   "Create local stubs that proxy calls to a remote node's exports."
-  (let* ((info (get-node (string node)))
+  (let* ((info (get-node node))
          (remote-pkg (getf info :package))
          (node-name (getf info :name))
          ;; Fetch the list of exported symbol names from the remote.
-         (symbols (eval-at node
+         (symbols (eval-in node
                     `(loop for s being the external-symbols of ,remote-pkg
                            collect (symbol-name s)))))
     (dolist (sym-name symbols)
-      (let ((local-sym (intern sym-name :consortium)))
+      (let ((local-sym (intern sym-name :consortium/sync)))
         ;; Each stub captures the node name and symbol name, then delegates.
         ;; This creates transparent remote procedure calls.
         (let ((captured-name node-name)
@@ -305,10 +315,10 @@
               (captured-pkg remote-pkg))
           (setf (symbol-function local-sym)
                 (lambda (&rest args)
-                  (eval-at captured-name
+                  (eval-in captured-name
                     `(apply (find-symbol ,captured-sym ,captured-pkg)
                             ',args)))))
-        (export local-sym :consortium)))
+        (export local-sym :consortium/sync)))
     (format t "~&[consortium] Imported ~A symbols from ~A~%"
             (length symbols) node-name)
     symbols))
@@ -318,5 +328,5 @@
   ;; Skip ourselves to avoid circular stubs.
   (dolist (info (nodes))
     (let ((name (getf info :name)))
-      (unless (and *self* (string= name (getf *self* :name)))
-        (ignore-errors (import-remote-symbols name))))))
+      (unless (and *this-node* (string= name (getf *this-node* :name)))
+        (ignore-errors (sync-remote-symbols name))))))

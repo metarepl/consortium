@@ -8,9 +8,10 @@
   (format nil "~(~A~)" name))
 
 (defun register (name &optional (port (+ 40000 (random 100))))
-  "Register this image and start micros."
+  "Register this image and start server."
   (ensure-directories-exist *registry*)
   (micros:create-server :port port :dont-close t)
+  (setf micros:*use-dedicated-output-stream* t)
   (with-open-file (s (merge-pathnames (concatenate 'string (make-name name) ".node")
                                       *registry*)
                      :direction :output

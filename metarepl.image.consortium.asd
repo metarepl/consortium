@@ -9,6 +9,7 @@
                :micros
                :swank-client
                :usocket
+               :find-port
                :bordeaux-threads
 
                :journal
