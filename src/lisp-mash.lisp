@@ -1,4 +1,4 @@
-(in-package :consortium)
+(in-package :lisp-mash)
 
 ;; &&& use https://github.com/kanru/cl-isolated to sandbox inter image calls?
 ;; &&& or secure incoming connections to a repl by password?
@@ -11,7 +11,7 @@
 ;; OS processes that can't share memory. A simple directory of files is
 ;; more robust than a central server that could become a single point of failure.
 (defvar *registry-path*
-  (merge-pathnames ".config/consortium/registry/"
+  (merge-pathnames ".config/lisp-mash/registry/"
                    (user-homedir-pathname)))
 
 ;; Local cache avoids hitting the filesystem on every operation.
@@ -106,7 +106,7 @@
         ;; Don't prune ourselves even if the check fails.
         (unless (and *this-node*
                      (string= name (getf *this-node* :name)))
-          (format t "~&[consortium] Pruning dead node: ~A~%" name)
+          (format t "~&[lisp-mash] Pruning dead node: ~A~%" name)
           (delete-node-file name))))))
 
 (defun heartbeat-tasks ()
@@ -122,7 +122,7 @@
            (loop
              (sleep *heartbeat-interval*)
              (heartbeat-tasks)))
-         :name "consortium-heartbeat")))
+         :name "lisp-mash-heartbeat")))
 
 (defun compute-symbol-hash (package)
   ;; Sorting ensures deterministic hashing regardless of internal symbol order.
@@ -150,7 +150,7 @@
         (setf (getf *this-node* :symbol-hash) new-hash
               (getf *this-node* :updated-at) (get-universal-time))
         (write-node-file (getf *this-node* :name) *this-node*)
-        (format t "~&[consortium] Exports changed, registration updated~%")))))
+        (format t "~&[lisp-mash] Exports changed, registration updated~%")))))
 
 (defun self-monitor-tasks ()
   (ensure-registration)
@@ -166,7 +166,7 @@
            (loop
              (sleep *self-monitor-interval*)
              (self-monitor-tasks)))
-         :name "consortium-self-monitor")))
+         :name "lisp-mash-self-monitor")))
 
 (defun stop-monitors ()
   ;; Clean shutdown for both threads.
@@ -198,7 +198,7 @@
     (warn "No exit hook mechanism known for this implementation")))
 
 (defun register-image (node-name)
-  "Register this Lisp image as a node in the consortium network.
+  "Register this Lisp image as a node in the lisp-mash network.
    Call this from a lisp application's config file."
   (let* ((pkg-name (package-name *package*))
          (name (make-name node-name))
@@ -230,7 +230,7 @@
     ;; (start-heartbeat)
     ;; (start-self-monitor)
 
-    (format t "~&[consortium] registered ~A on port ~A~%" name port)
+    (format t "~&[lisp-mash] registered ~A on port ~A~%" name port)
     info))
 
 (defun unregister-image ()
@@ -238,7 +238,7 @@
   (when *this-node*
     (stop-node (getf *this-node* :name)
                (getf *this-node* :port))
-    (format t "~&[consortium] ~A unregistered~%" (getf *this-node* :name))
+    (format t "~&[lisp-mash] ~A unregistered~%" (getf *this-node* :name))
     (setf *this-node* nil
           *symbol-hash* nil)))
 
@@ -307,7 +307,7 @@
                     `(loop for s being the external-symbols of ,remote-pkg
                            collect (symbol-name s)))))
     (dolist (sym-name symbols)
-      (let ((local-sym (intern sym-name :consortium/sync)))
+      (let ((local-sym (intern sym-name :lisp-mash/mash)))
         ;; Each stub captures the node name and symbol name, then delegates.
         ;; This creates transparent remote procedure calls.
         (let ((captured-name node-name)
@@ -318,8 +318,8 @@
                   (eval-in captured-name
                     `(apply (find-symbol ,captured-sym ,captured-pkg)
                             ',args)))))
-        (export local-sym :consortium/sync)))
-    (format t "~&[consortium] Imported ~A symbols from ~A~%"
+        (export local-sym :lisp-mash/mash)))
+    (format t "~&[lisp-mash] Imported ~A symbols from ~A~%"
             (length symbols) node-name)
     symbols))
 

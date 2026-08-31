@@ -1,6 +1,6 @@
-(defpackage #:consortium
-  (:nicknames #:metarepl.image.consortium)
-  (:documentation "consortium main package")
+(defpackage #:lisp-mash
+  (:nicknames #:metarepl.image.lisp-mash)
+  (:documentation "lisp-mash main package")
   (:use #:cl)
   ;;                                       ; &&&
   ;; (:shadow &&&)
@@ -22,12 +22,13 @@
            #:import-remote-symbols
            #:*registry-path*))
 
-(defpackage #:consortium/sync
-  (:documentation "synced symbols")
+(defpackage #:lisp-mash/mash
+  (:nicknames #:metarepl.image.lisp-mash/mash #:mash)
+  (:documentation "lisp-mash synced symbols")
   (:use )
   (:export))
 
-(defpackage #:consortium/minimal
+(defpackage #:lisp-mash/minimal
   (:use #:cl)
   (:export #:register
            #:nodes

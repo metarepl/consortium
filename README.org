@@ -1,18 +1,8 @@
-* consortium
+* lisp-mash
 
-Consortium: a Latin word meaning
-"partnership", "association", or "society",
-and derives from consors ("shared in property"),
-which is in turn derived from con ("together") and sors ("fate").
-
-A consortium is an association of two or more
-individuals, companies, organizations, or governments
-with the objective of participating in a common activity or pooling their resources
-for achieving a common goal.
-
-This system "Consortium" is a coordination layer for interprocess communication of Common Lisp images.
-Each image (exempli gratia: StumpWM, Nyxt, Lem, Autolith etc.)
-independently registers itself with consortium
+The lisp-mash system is a coordination layer for interprocess communication of Common Lisp images.
+Each image (eg. StumpWM, Nyxt, Lem, Autolith etc.)
+independently registers itself with lisp-mash
 creating a mesh of cooperating Lisp processes that can evaluate code
 in each other and share symbols — a lightweight Lisp machine on the network without rewriting the world.
 
@@ -25,30 +15,30 @@ TODO import and symbol sync between images
 
 FILE ~/.stumpwmrc
 #+begin_src lisp
-  (asdf:load-system :metarepl.image.consortium)
-  (consortium:register-image :stumpwm)
+  (asdf:load-system :metarepl.image.lisp-mash)
+  (lisp-mash:register-image :stumpwm)
 #+end_src
 
 FILE ~/.nyxtrc
 #+begin_src lisp
-  (asdf:load-system :metarepl.image.consortium)
-  (consortium:register-image :nyxt)
+  (asdf:load-system :metarepl.image.lisp-mash)
+  (lisp-mash:register-image :nyxt)
 #+end_src
 
 Then from any node:
 #+begin_src lisp
-  (consortium:nodes)
+  (lisp-mash:nodes)
 
   ;; evaluation
-  (consortium:eval-in :nyxt '(nyxt:current-url))
-  (consortium:broadcast '(print "hello from all nodes"))
+  (lisp-mash:eval-in :nyxt '(nyxt:current-url))
+  (lisp-mash:broadcast '(print "hello from all nodes"))
 
   ;; symbol sharing
-  (consortium:import-remote-symbols :nyxt) ;; from one node
-  (consortium:sync-all)  ;; from all nodes
+  (lisp-mash:import-remote-symbols :nyxt) ;; from one node
+  (lisp-mash:sync-all)  ;; from all nodes
 
   ;; unification
-  (consortium:broadcast '(consortium:sync-all)) ;; interconnect all nodes to all nodes
+  (lisp-mash:broadcast '(lisp-mash:sync-all)) ;; interconnect all nodes to all nodes
 
 #+end_src
 
@@ -57,25 +47,25 @@ Then from any node:
 FILE ~/.stumpwmrc
 #+begin_src lisp
   (asdf:load-system :micros)
-  (asdf:load-system :metarepl.image.consortium)
-  (consortium/minimal:register "stumpwm" 40001)
+  (asdf:load-system :metarepl.image.lisp-mash)
+  (lisp-mash/minimal:register "stumpwm" 40001)
 #+end_src
 
 FILE ~/.nyxtrc
 #+begin_src lisp
   (asdf:load-system :micros)
-  (asdf:load-system :metarepl.image.consortium)
-  (consortium/minimal:register "nyxt" 40002)
+  (asdf:load-system :metarepl.image.lisp-mash)
+  (lisp-mash/minimal:register "nyxt" 40002)
 #+end_src
 
 From either image:
 #+begin_src lisp
-  (consortium/minimal:nodes)
+  (lisp-mash/minimal:nodes)
   ;; => ((:NAME "stumpwm" :PORT 40001) (:NAME "nyxt" :PORT 40002))
 
-  (consortium/minimal:eval-in "nyxt" '(+ 1 1))
+  (lisp-mash/minimal:eval-in "nyxt" '(+ 1 1))
   ;; => 2
 
-  (consortium/minimal:eval-in "stumpwm" '(stumpwm:current-window))
+  (lisp-mash/minimal:eval-in "stumpwm" '(stumpwm:current-window))
 
 #+end_src

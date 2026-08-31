@@ -1,7 +1,7 @@
-(in-package :consortium/minimal)
+(in-package :lisp-mash/minimal)
 
 ;; Filesystem coordination because images are in separate OS processes.
-(defvar *registry* (merge-pathnames ".consortium-minimal/" (user-homedir-pathname)))
+(defvar *registry* (merge-pathnames ".lisp-mash-minimal/" (user-homedir-pathname)))
 
 (defun make-name (name)
   "converts string or keyword or symbol to string"
@@ -17,7 +17,7 @@
                      :direction :output
                      :if-exists :supersede)
     (prin1 (list :name (make-name name) :port port) s))
-  (format t "~&[consortium] registered ~A on port ~A~%" (make-name name) port))
+  (format t "~&[lisp-mash] registered ~A on port ~A~%" (make-name name) port))
 
 (defun nodes ()
   "List all registered nodes."

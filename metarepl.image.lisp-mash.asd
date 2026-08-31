@@ -1,4 +1,4 @@
-(defsystem "metarepl.image.consortium"
+(defsystem "metarepl.image.lisp-mash"
   :description "inter-image coordination layer"
   :author "metarepl (https://github.com/metarepl)"
   :version "0.0.1"
